@@ -1,0 +1,247 @@
+/* Ensure TinyMCE is usable */
+textarea#description {
+    z-index: 1;
+    position: relative;
+}
+
+.checkmark {
+    width: 20px;
+    height: 20px;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    border: 2px solid #39B54A;
+    border-radius: 50%;
+    outline: none;
+    cursor: pointer;
+    position: relative;
+    transition: background-color 0.3s, transform 0.3s;
+}
+
+.checkmark:checked {
+    background-color: #39B54A;
+    transform: scale(1.2);
+}
+
+.checkmark:checked::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 2px;
+    width: 6px;
+    height: 10px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.confetti {
+    position: absolute;
+    width: 5px;
+    height: 10px;
+    background-color: #f2d74e;
+    border-radius: 2px;
+    opacity: 0;
+    animation: confetti-fall 1s ease-out forwards;
+}
+
+@keyframes confetti-fall {
+    0% {
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(var(--x), var(--y)) rotate(720deg);
+        opacity: 0;
+    }
+}
+
+.top_add_button {
+    width: 45px;
+    font-size: smaller;
+    border-radius: 0px;
+}
+
+.bottom_add_button {
+    width: 101px;
+    font-size: smaller;
+    margin-top: 9px;
+    border-radius: 0px;
+}
+
+/* Media query for mobile devices */
+@media (max-width: 768px) {
+    .mobile-hide {
+        display: none;
+    }
+
+}
+
+#title,
+#completion_date,
+#completion_time {
+    border: none;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.281);
+    border-radius: 0;
+}
+
+.underline-border {
+    border: none;
+    border-bottom: 1px solid #dddddd69;
+    /* Adjust the color as needed */
+}
+
+.fixed-button {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 40px;
+    height: 40px;
+    background-color: #007BFF;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    font-size: 16px;
+    border-radius: 60%;
+}
+
+.fixed-button:hover {
+    background-color: #0056b3;
+}
+
+#add-menu {
+    background-color: transparent;
+    /* Make background transparent */
+    border: none;
+    /* Remove border for cleaner look */
+    box-shadow: none;
+    /* Remove shadow for complete transparency */
+}
+
+.dropdown-item {
+    padding: 10px 20px;
+}
+
+/* Styles for the popup */
+.popup {
+    position: fixed;
+    bottom: 0px;
+    right: 70px;
+    width: 500px;
+    height: 30%;
+    background-color: white;
+    border: 1px solid #ddd;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    border-radius: 5px;
+    padding: 10px;
+    display: none;
+    z-index: 1000;
+    background-color: #222e3c;
+}
+
+/* Close button styles */
+.close-popup-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: transparent;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+@media (max-width: 768px) {
+    .popup {
+        width: 80%;
+        background-color: #222e3c;
+    }
+
+}
+
+/* Sidebar Content Create Task */
+
+.mb-5 {
+    margin-bottom: 4rem !important;
+    /* This is equivalent to 80px */
+}
+
+#transparent-btn {
+    opacity: 0.7;
+}
+
+#sidebarRight,
+#sidebarRight2,
+#sidebarRight1 {
+    width: 50% !important;
+}
+
+/* Media query for mobile devices */
+@media (max-width: 768px) {
+
+    #sidebarRight,
+    #sidebarRight2,
+    #sidebarRight1 {
+        width: 100% !important;
+    }
+}
+
+.button-wrapper {
+    position: sticky;
+    bottom: 0;
+    width: 100%;
+    padding: 10px;
+}
+
+.fixed-button {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1050;
+}
+
+.dropdown-menu {
+    z-index: 1050;
+}
+
+/* Spinner for loading screen */
+.spinner {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 22.4px;
+    height: 22.4px;
+}
+
+.spinner::before,
+.spinner::after {
+    --radius: 250;
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    animation: spinner-w7nm60 2.4s infinite linear;
+    background: #3b7ddd;
+    border-radius: 50%;
+}
+
+.spinner::before {
+    --radius: -250;
+    background: #8947aa;
+}
+
+@keyframes spinner-w7nm60 {
+    0% {
+        transform: scale(1) rotate(0deg) translateY(calc(var(--radius) * 1%));
+    }
+
+    50% {
+        transform: scale(0.5) rotate(1440deg) translateY(0);
+    }
+
+    100% {
+        transform: scale(1) rotate(2920deg) translateY(calc(var(--radius) * 1%));
+    }
+}

@@ -1,0 +1,118 @@
+{% extends '../base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="list-group" id="list-group-wrapper-all">
+        <!-- notifications display -->
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="notificationModal" tabindex="-1" aria-labelledby="notificationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="notificationModalLabel">Notification Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="modal-body-content">
+                <!-- Notification details will be injected here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function buildList() {
+        var wrapper = document.getElementById('list-group-wrapper-all');
+
+        var url = 'http://127.0.0.1:7000/api/notifications/';
+        
+        fetch(url)
+        .then((resp) => resp.json())
+        .then(function(data) {
+            console.log('Data', data);
+
+            // Clear the wrapper before adding new items
+            wrapper.innerHTML = '';
+
+            var notiflist = data;
+
+            for (var i = 0; i < Math.min(5, notiflist.length); i++) {
+                var title = notiflist[i].title;
+                if (title.length > 20) {
+                    title = title.substring(0, 20) + '...';
+                }
+
+                var icon;
+                switch (notiflist[i].notification_type) {
+                    case 'info':
+                        icon = '<i class="text-primary" data-feather="home"></i>';
+                        break;
+                    case 'warning':
+                        icon = '<i class="text-warning" data-feather="bell"></i>';
+                        break;
+                    case 'error':
+                        icon = '<i class="text-danger" data-feather="alert-circle"></i>';
+                        break;
+                    case 'success':
+                        icon = '<i class="text-success" data-feather="user-plus"></i>';
+                        break;
+                    default:
+                        icon = '<i class="text-muted" data-feather="info"></i>';  // Default icon
+                }
+
+                var item = `
+                    <a href="#" class="list-group-item" data-bs-toggle="modal" data-bs-target="#notificationModal" onclick="loadNotificationDetail(${notiflist[i].id})">
+                        <div class="row g-0 align-items-center">
+                            <div class="col-10">
+                                <div class="text-dark">
+                                    <h5><span style="margin-right: 12px;">${icon}</span>${title}</h5>
+                                </div>
+                                <div class="text-muted small mt-1">${new Date(notiflist[i].created_at).toLocaleString()}</div>
+                            </div>
+                        </div>
+                    </a>
+                `;
+                wrapper.innerHTML += item;
+            }
+
+            if (typeof feather !== 'undefined') {
+                feather.replace();
+            }
+        })
+        .catch(function(error) {
+            console.error('Error:', error);
+        });
+    }
+
+    function loadNotificationDetail(notificationId) {
+        var url = `http://127.0.0.1:7000/api/notification-detail/${notificationId}/`;
+
+        fetch(url)
+        .then((resp) => resp.json())
+        .then(function(data) {
+            var modalBodyContent = document.getElementById('modal-body-content');
+            if (modalBodyContent) {
+                modalBodyContent.innerHTML = `
+                    <h5>${data.title}</h5>
+                    <p><strong>Type:</strong> ${data.notification_type}</p>
+                    <p><strong>Created:</strong> ${new Date(data.created_at).toLocaleString()}</p>
+                    <p>${data.description}</p>
+                `;
+            }
+        })
+        .catch(function(error) {
+            console.log('Error:', error);
+        });
+    }
+
+    // Call the function after defining it
+    buildList();
+</script>
+
+{% endblock %}

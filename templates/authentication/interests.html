@@ -1,0 +1,127 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+	<link rel="shortcut icon" href="{% static 'img/icons/icon-48x48.png' %}" />
+
+	<link class="js-stylesheet" href="{% static 'css/dark.css' %}" rel="stylesheet">
+</head>
+<body>
+    <style>
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap; /* Allows the cards to wrap to the next line if necessary */
+            background-color: #222E3C;
+            padding: 12px;
+            border-top-left-radius: 15px;  /* Bottom left corner */
+            border-top-right-radius: 15px; /* Bottom right corner */
+        
+        }
+        
+        .checkmark-container {
+            margin-bottom: 10px; /* Adds space between each checkbox item */
+        }
+        
+        .badge {
+            background-color: #19222c;
+            padding: 8px;
+            color: #fff; /* Ensure text is readable */
+            display: flex;
+            align-items: center; /* Aligns the checkbox and label vertically centered */
+            margin-right: 8px; /* Adds space between badge pills */
+            margin-bottom: 8px; /* Adds space between rows of badges */
+        }
+        
+        .checkmark {
+            width: 15px;
+            height: 15px;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            border: 2px solid #39B54A;
+            border-radius: 50%;
+            outline: none;
+            cursor: pointer;
+            position: relative;
+            transition: background-color 0.3s, transform 0.3s;
+            margin-right: 8px; /* Adds space between checkbox and label */
+        }
+        
+        .checkmark:checked {
+            background-color: #39B54A;
+            transform: scale(1.2);
+        }
+        
+        .checkmark:checked::after {
+            content: '';
+            position: absolute;
+            left: 4px;
+            top: 1px;
+            width: 4px;
+            height: 7px;
+            border: solid #fff;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+        .typing-effect {
+            font-size: 24px;
+            white-space: nowrap;
+            overflow: hidden;
+            border-right: 3px solid;
+            animation: blink-caret 0.75s step-end infinite;
+        }
+
+        @keyframes blink-caret {
+            from, to {
+                border-color: transparent;
+            }
+            50% {
+                border-color: black;
+            }
+        }
+        </style>
+        <div class="container" style="margin-top: 1.5rem;">
+            <center>
+                <h3 class="typing-effect" id="typing-effect"></h3>
+                <p>Select the mindset you want to cultivate and connect with others on the same journey!</p>
+            </center>
+            <form method="post">
+                {% csrf_token %}
+                <div class="checkbox-group">
+                    {% for interest in form.interests %}
+                        <div class="checkmark-container">
+                            <span class="badge rounded-pill">
+                                {{ interest.tag|safe }}
+                                {{ interest.choice_label }}
+                            </span>
+                        </div>
+                    {% endfor %}
+                </div>
+                <button class="btn btn-primary form-control" type="submit">Save</button>
+            </form>
+        </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const text = "NeoAnton";
+            let index = 0;
+            const typingElement = document.getElementById('typing-effect');
+
+            function type() {
+                if (index < text.length) {
+                    typingElement.innerHTML += text.charAt(index);
+                    index++;
+                    setTimeout(type, 100); // Adjust the speed by changing the timeout value
+                }
+            }
+
+            type();
+        });
+    </script>
+</body>
+</html>

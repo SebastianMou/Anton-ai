@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid p-0 d-flex justify-content-center">
+    <div>
+        <h1 class="h3 mb-3 text-center">Profile</h1>
+
+        <div class="row justify-content-center">
+            <div class="col">
+                <div class="card mb-3">
+                    <div class="card-body text-center">
+                        <img src="{% static 'img/icons/user (1).png' %}" alt="Christina Mason"
+                            class="img-fluid rounded-circle mb-2" width="128" height="128">
+                        <h5 class="card-title mb-0">username </h5>
+                        <div class="text-muted mb-2">first and last name</div>
+                    </div>
+                    <hr class="my-0">
+                    <div class="card-body intrests">
+                        <h5 class="h6 card-title">intrests</h5>
+                        <!-- This is where the a tags are going to goof interest -->
+                    </div>
+                    <hr class="my-0">
+                    <div class="card-body">
+                        <h5 class="h6 card-title">Elsewhere</h5>
+                        <ul class="list-unstyled mb-0 d-flex flex-wrap">
+                            <li class="mb-1 me-3"><span class="fas fa-globe fa-fw me-1"></span> <a
+                                    href="#">staciehall.co</a></li>
+                            <li class="mb-1 me-3"><span class="fab fa-twitter fa-fw me-1"></span> <a
+                                    href="#">Twitter</a></li>
+                            <li class="mb-1 me-3"><span class="fab fa-facebook fa-fw me-1"></span> <a
+                                    href="#">Facebook</a></li>
+                            <li class="mb-1 me-3"><span class="fab fa-instagram fa-fw me-1"></span> <a
+                                    href="#">Instagram</a></li>
+                            <li class="mb-1"><span class="fab fa-linkedin fa-fw me-1"></span> <a href="#">LinkedIn</a>
+                            </li>
+                        </ul>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    fetch('http://127.0.0.1:7000/api/user-interests-list/', {
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => 
+        response.ok ? response.json() : Promise.reject(`HTTP error! status: ${response.status}`)
+    )
+    .then(data => {
+        const cardBody = document.querySelector('.intrests');
+
+        // Update username
+        const usernameElement = document.querySelector('.card-title.mb-0');
+        usernameElement.textContent = data.user.username;
+
+        // Update first and last name
+        const nameElement = document.querySelector('.text-muted.mb-2');
+        nameElement.textContent = `${data.user.first_name} ${data.user.last_name}`;
+
+        // Clear any existing badges if necessary
+        cardBody.querySelectorAll('.badge').forEach(badge => badge.remove());
+
+        // Display interests
+        data.interests.forEach(interest => {
+            const badge = document.createElement('a');
+            badge.href = '#';
+            badge.className = 'badge bg-primary me-1 my-1';
+            badge.textContent = interest.name;
+
+            cardBody.appendChild(badge);
+        });
+    })
+    .catch(error => {
+        console.error('Error fetching interests:', error);
+    });
+});
+
+
+
+
+
+</script>
+
+{% endblock %}

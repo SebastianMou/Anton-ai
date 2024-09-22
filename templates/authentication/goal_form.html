@@ -1,0 +1,186 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form with Carousel and Popovers</title>
+    <style>
+        .popover {
+            position: absolute;
+            display: none;
+            background-color: #333;
+            color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            width: 200px;
+            z-index: 1000;
+        }
+        .carousel-control-prev,
+        .carousel-control-next {
+            z-index: 1001;
+        }
+    </style>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <link class="js-stylesheet" href="{% static 'css/dark.css' %}" rel="stylesheet">
+</head>
+<body>
+    <div class="container" style="width: 50%;">
+        <div id="carousel" class="carousel mt-3">
+            <div class="carousel-inner">
+                <h3><a href="{% url 'pages' %}">&#8592; Skip</a></h3>
+                <form method="POST" class="my-4">
+
+                    <div class="carousel-item active">
+                        <div class="card">
+                            <div class="card-body">
+                                {% csrf_token %}
+                                <center><h2>Current Situation</h2></center>
+                                <div class="mb-3">
+                                    <label for="id_current_working_on" class="form-label">
+                                        Why did you choose Anton? What do you hope to achieve?
+                                        <i class="align-middle me-2 fas fa-fw fa-question-circle" data-popover="I chose Anton because I want a tool that can help me stay focused and organized."></i>
+                                    </label>
+                                    <textarea class="form-control" id="id_current_working_on" name="current_working_on" rows="4">{{ form.current_working_on.value|default:'' }}</textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="id_progress_towards_goals" class="form-label">
+                                        How would you describe yourself in a few words?
+                                        <i class="align-middle me-2 fas fa-fw fa-question-circle" data-popover="I am a driven professional who values continuous learning and personal growth."></i>
+                                    </label>
+                                    <textarea class="form-control" id="id_progress_towards_goals" name="progress_towards_goals" rows="4">{{ form.progress_towards_goals.value|default:'' }}</textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="id_challenges" class="form-label">
+                                        What personal or professional challenges are you currently facing?
+                                        <i class="align-middle me-2 fas fa-fw fa-question-circle" data-popover="I struggle with procrastination and often find it hard to stick to my goals."></i>
+                                    </label>
+                                    <textarea class="form-control" id="id_challenges" name="challenges" rows="4">{{ form.challenges.value|default:'' }}</textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="carousel-item">
+                        <div class="card">
+                            <div class="card-body">
+                                <center><h2>Desired Outcomes</h2></center>
+                                <div class="mb-3">
+                                    <label for="id_one_year_goal" class="form-label">
+                                        What are your top three personal development goals?
+                                        <i class="align-middle me-2 fas fa-fw fa-question-circle" data-popover="I want to improve my time management, develop a positive mindset, and learn a new skill."></i>
+                                    </label>
+                                    <textarea class="form-control" id="id_one_year_goal" name="one_year_goal" rows="4">{{ form.one_year_goal.value|default:'' }}</textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="id_five_year_goal" class="form-label">
+                                        How do you prefer to receive feedback or support?
+                                        <i class="align-middle me-2 fas fa-fw fa-question-circle" data-popover="I prefer receiving constructive feedback through actionable suggestions and positive reinforcement."></i>
+                                    </label>
+                                    <textarea class="form-control" id="id_five_year_goal" name="five_year_goal" rows="4">{{ form.five_year_goal.value|default:'' }}</textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="id_achievements_feel_successful" class="form-label">
+                                        What areas do you feel you need the most improvement in?
+                                        <i class="align-middle me-2 fas fa-fw fa-question-circle" data-popover="I need to work on my confidence and being more assertive in social situations."></i>
+                                    </label>
+                                    <textarea class="form-control" id="id_achievements_feel_successful" name="achievements_feel_successful" rows="4">{{ form.achievements_feel_successful.value|default:'' }}</textarea>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Submit</button>
+                        </div>
+                    </div>
+
+                    
+            </form>
+                
+            </div>
+            <div class="carousel-controls">
+                <div class="row">
+                    <div class="col">
+                        <button class="btn btn-outline-primary form-control" id="prevBtn">Previous</button>
+                    </div>
+                    <div class="col">
+                        <button class="btn btn-outline-primary form-control" id="nextBtn">Next</button>
+                    </div>
+
+                </div>
+            </div>
+           
+        </div>
+    </div>
+    
+    <div id="popover" class="popover"></div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var popover = document.getElementById('popover');
+            var triggers = document.querySelectorAll('[data-popover]');
+            var carousel = document.getElementById('carousel');
+            var items = carousel.querySelectorAll('.carousel-item');
+            var currentIndex = 0;
+    
+            function showItem(index) {
+                items[currentIndex].classList.remove('active');
+                items[index].classList.add('active');
+                currentIndex = index;
+                updateButtons();
+            }
+    
+            function updateButtons() {
+                var prevBtn = document.getElementById('prevBtn');
+                var nextBtn = document.getElementById('nextBtn');
+    
+                if (currentIndex === 0) {
+                    prevBtn.style.display = 'none';
+                } else {
+                    prevBtn.style.display = 'block';
+                }
+    
+                if (currentIndex === items.length - 1) {
+                    nextBtn.style.display = 'none';
+                } else {
+                    nextBtn.style.display = 'block';
+                }
+            }
+    
+            document.getElementById('prevBtn').addEventListener('click', function() {
+                var nextIndex = (currentIndex - 1 + items.length) % items.length;
+                showItem(nextIndex);
+            });
+    
+            document.getElementById('nextBtn').addEventListener('click', function() {
+                var nextIndex = (currentIndex + 1) % items.length;
+                showItem(nextIndex);
+            });
+    
+            triggers.forEach(function(trigger) {
+                trigger.addEventListener('click', function(event) {
+                    event.preventDefault(); // Prevent default behavior
+                    var content = this.getAttribute('data-popover');
+                    popover.innerHTML = content;
+                    var rect = this.getBoundingClientRect();
+                    popover.style.top = (rect.bottom + window.scrollY + 10) + 'px';
+                    popover.style.left = (rect.left + window.scrollX + (rect.width / 2) - (popover.offsetWidth / 2)) + 'px';
+                    popover.style.display = (popover.style.display === 'block') ? 'none' : 'block';
+                });
+            });
+    
+            document.addEventListener('click', function(event) {
+                if (!popover.contains(event.target) && !event.target.matches('[data-popover]')) {
+                    popover.style.display = 'none';
+                }
+            });
+    
+            // Initial call to update buttons
+            updateButtons();
+        });
+    </script>
+    
+    
+
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/5.1.3/js/bootstrap.min.js"></script>
+
+</body>
+</html>
