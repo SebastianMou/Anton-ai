@@ -1,12 +1,9 @@
-## Project Features
+# Project Progress Tracker
 
-I have successfully recreated the task management features without the use of AI. The project now includes:
+## Features Implemented
 
-- **Full CRUD functionality** for tasks and subtasks.
-- Ability to manage **subtasks** with CRUD operations.
-- Option to **check/uncheck** the completion status of both main tasks and subtasks.
-- Working on **drag-and-drop functionality** for task reordering using Sortable.js.
-
-### Current Issue:
-- **New tasks** are currently rendering at the bottom of the task list, while I want them to render at the top.
-- When tasks are set to render on top, the **drag-and-drop functionality** behaves unexpectedly, with positions getting mixed up. I'm actively working on resolving this issue.
+- **Drag and Drop Functionality:**
+  - Successfully added the drag-and-drop feature to the main tasks.
+  
+- **Task Rendering:**
+  - Successfully added that newly created main tasks render on top of the old tasks.

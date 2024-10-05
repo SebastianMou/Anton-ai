@@ -143,22 +143,35 @@ def category_details_api(request, pk):
 
 @api_view(['GET'])
 def task_list(request, category_id):
-    print(f"Received request for category_id: {category_id}")  # Log the category ID
+    print(f"Received request for category_id: {category_id}")
 
     category = TaskCategory.objects.get(id=category_id, owner=request.user)
     
-    # Sort tasks by position in ascending order (smallest position first),
-    # and within the same position, show the most recent tasks on top
+    # Order first by position (ascending), then by created_at in descending order for tasks within the same position
     tasks = Task.objects.filter(owner=request.user, category=category_id).order_by('position', '-created_at')
 
     serializer = TaskSerializer(tasks, many=True)
     category_serializer = TaskCategorySerializer(category)
     
-    # Return the sorted tasks along with the category data
     return Response({
         'tasks': serializer.data,
         'category': category_serializer.data
     })
+
+@api_view(['POST'])
+def update_task_order(request, category_id):
+    try:
+        task_order = request.data  # Since you're sending a list directly, this should capture it
+        for task_data in task_order:
+            task = Task.objects.get(id=task_data['id'], category_id=category_id, owner=request.user)
+            task.position = task_data['position']
+            task.save()
+        return Response({'message': 'Task order updated successfully'})
+    except Exception as e:
+        # Log the error for debugging
+        print(f"Error updating task order: {str(e)}")
+        return Response({'error': str(e)}, status=500)
+
 
 @api_view(['GET'])
 def task_detail(request, pk):
@@ -173,10 +186,14 @@ def task_create(request):
         owner = request.user
         category = TaskCategory.objects.get(id=data['category'])
 
-        # Get the highest current position in the category and add 1
-        max_position = Task.objects.filter(category=category, owner=owner).aggregate(Max('position'))['position__max']
-        new_position = (max_position or 0) + 1
+        # Instead of updating all positions in bulk, loop through each task and update
+        tasks_to_update = Task.objects.filter(category=category, owner=owner).order_by('-position')
+        
+        for task in tasks_to_update:
+            task.position += 1
+            task.save()
 
+        # Now create the new task at position 1
         task = Task.objects.create(
             category=category,
             title=data['title'],
@@ -184,14 +201,16 @@ def task_create(request):
             completion_date=data.get('completion_date'),
             completion_time=data.get('completion_time'),
             description=data.get('description', ''),
-            position=new_position,
+            position=1,  # New task gets position 1
             owner=owner
         )
 
         serializer = TaskSerializer(task, many=False)
         return Response(serializer.data)
     except Exception as e:
+        print(f"Error during task creation: {str(e)}")  # Log the error for debugging
         return Response({'error': str(e)}, status=500)
+
 
 @api_view(['POST'])
 def toggle_task_completion(request, pk):
@@ -243,16 +262,6 @@ def delete_all_tasks_in_category(request, category_id):
     
     except TaskCategory.DoesNotExist:
         return Response({"message": "Category not found."}, status=status.HTTP_404_NOT_FOUND)
-
-@api_view(['POST'])
-def update_task_order(request, category_id):
-    task_order = request.data.get('taskOrder', [])
-    for task_data in task_order:
-        task = Task.objects.get(id=task_data['id'], category_id=category_id)
-        task.position = task_data['position']
-        task.save()
-    
-    return Response({'message': 'Task order updated successfully'})
 
 ## -----------------------------------------------------------------------
 ## ------------------------- SUBTASK C.R.U.D -----------------------------
