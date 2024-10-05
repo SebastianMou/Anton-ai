@@ -1,3 +1,4 @@
+
 {% extends '../base.html' %}
 {% load static %}
 <title>{% block title %}Anton To Do.{% endblock %}</title>
@@ -5,6 +6,8 @@
 <audio id="pop-sound" src="{% static 'sound affect/happy-pop-2-185287.mp3' %}"></audio>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tinymce/7.1.2/tinymce.min.js" referrerpolicy="origin"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
+<script src="https://unpkg.com/feather-icons"></script>
+
 <script>
     tinymce.init({
         selector: 'textarea#description',
@@ -27,7 +30,8 @@
         `
     });
 </script>
-<button id="confirm-positions-btn">update</button>
+<i class="align-middle" data-feather="more-horizontal"></i>
+<!-- <button id="confirm-positions-btn">update</button> -->
 <div class="dropup">
     <button class="btn btn-secondary fixed-button" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
         <i data-feather="plus"></i>
@@ -42,7 +46,6 @@
             </a>
         </li>
         <li><a class="dropdown-item" href="#"><i class="align-middle me-2 far fa-fw fa-file-pdf"></i> PDF</a></li>
-        <li><a class="dropdown-item" href="#" data-bs-toggle="offcanvas" data-bs-target="#sidebarRight" aria-controls="sidebarRight"><i class="align-middle me-2 fas fa-fw fa-plus"></i> Add Task</a></li>
     </ul>
 </div>
 <!-- Spinner for loading screen -->
@@ -52,7 +55,6 @@
     <div class="card">
         <div class="card-header text-center bg-primary text-white">
             <h1 id="category-header">Category Name</h1>
-
             <p style="color: white;" id="category-created-at"></p>
             <input type="hidden" id="category-id" value="{{ pk }}">
         </div>
@@ -61,14 +63,16 @@
             <script>
                 var categoryId = {{ pk }};
             </script>
-            <button class="btn btn-danger" style="border-radius: 0px;" onclick="deleteAllTasksInCategory(categoryId)"><i class="align-middle me-2" data-feather="trash"></i></button>
+            <button class="btn btn-danger delete-all-btn" data-category-id="{{ pk }}">
+                <i class="align-middle fas fa-trash"></i>
+            </button>
 
-            <button class="btn btn-primary top_add_button ms-auto" data-bs-toggle="offcanvas" data-bs-target="#sidebarRight" aria-controls="sidebarRight"><i style="color: #fff;" data-feather="plus"></i></button>
+            <button id="top-add-button" class="btn btn-primary top_add_button ms-auto" data-bs-toggle="offcanvas" data-bs-target="#sidebarRight" aria-controls="sidebarRight"><i style="color: #fff;" data-feather="plus"></i></button>
             <button class="btn btn-outline-secondary" id="aiAnalysisButton">AI</button>
         </div>
         
         <div class="card-body">
-            <div id="list-wrapper">
+            <div id="list-wrapper" class="list-group">
                 <!-- These are all the tasks -->
             </div>
             <button class="btn btn-primary bottom_add_button" data-bs-toggle="offcanvas" data-bs-target="#sidebarRight" aria-controls="sidebarRight"><i data-feather="plus"></i> New Task</button>
@@ -114,6 +118,7 @@
         </div>
     </div> 
 </div>
+
 <!-- Sidebar Content task detail -->
 <div class="offcanvas offcanvas-end" tabindex="-1" id="sidebarRight1" aria-labelledby="sidebarLabel">
     <div class="offcanvas-header">
@@ -128,6 +133,7 @@
         <div class="container-fluid full-height" id="task-detail-container">
             <!-- load task detail here -->
         </div>
+        
     </div>
 </div>
 
@@ -157,16 +163,14 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div id="subtask-edit-form-wrapper">
-                    <form id="subtask-edit-form" class="form-inline">
-                        <input type="hidden" id="edit-subtask-id" value=""/>
-                        <div class="form-group">
-                            <label for="edit-subtask-title">Subtask Title:</label>
-                            <input type="text" id="edit-subtask-title" class="form-control" placeholder="Enter subtask title">
-                        </div>
-                        <button type="submit" class="btn btn-primary">Save Subtask</button>
-                    </form>
-                </div>
+                <form id="subtask-edit-form">
+                    <input type="hidden" id="edit-subtask-id" />
+                    <div class="form-group">
+                        <label for="edit-subtask-title">Subtask Title:</label>
+                        <input type="text" id="edit-subtask-title" class="form-control" placeholder="Enter subtask title" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </form>
             </div>
         </div>
     </div>
@@ -196,43 +200,857 @@
 
 
 <script>
-document.getElementById('confirm-positions-btn').addEventListener('click', function() {
-    const taskItems = document.querySelectorAll('.list-group-item');
-    const updatedTasks = [];
-
-    // Loop through tasks to gather their current order/position
-    taskItems.forEach((taskItem, index) => {
-        const taskId = taskItem.getAttribute('data-task-id');
-        if (taskId) {
-            updatedTasks.push({ id: taskId, position: index });
+// Function to get CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
         }
-    });
+    }
+    return cookieValue;
+}
 
-    // Call the backend to save the new positions
-    fetch('/api/update-task-positions/', {
+const csrftoken = getCookie('csrftoken');
+
+// ------------------------------------------------------------------------
+// -------------- 1. Task List Building and Main Functionality ---------------
+// -These functions handle fetching and displaying the tasks and subtasks.-
+// ------------------------------------------------------------------------
+function buildList(categoryId) {
+    var wrapper = document.getElementById('list-wrapper');
+    var url = `http://127.0.0.1:7000/api/task-list/${categoryId}/`;
+
+    fetch(url)
+        .then((resp) => resp.json())
+        .then(function(data) {
+            console.log('Data list (JSON):', data);
+
+            // Clear the wrapper first
+            wrapper.innerHTML = '';
+
+            // Iterate over the tasks array inside the data object
+            var tasks = data.tasks;
+            tasks.forEach(function(task) {
+                const completionDate = task.completion_date || 'none';
+                const completionTime = task.completion_time || 'none';
+                const checked = task.completed ? 'checked' : '';
+
+                // Render subtasks
+                var subtasksHtml = '';
+                if (task.subtasks && task.subtasks.length > 0) {
+                    task.subtasks.forEach(function(subtask) {
+                        subtasksHtml += `
+                            <div class="subtask-item d-flex align-items-center p-2" style="margin-left: 35px;" data-subtask-id="${subtask.id}">
+                                <input type="checkbox" class="me-2 checkmark subtask-checkbox" id="subtaskCheckbox${subtask.id}" data-subtask-id="${subtask.id}" ${subtask.completed ? 'checked' : ''}>
+                                <span>${subtask.title}</span>
+                                <div class="dropdown ms-auto" style="padding-right: 15px;">
+                                    <button class="btn btn-link dropdown-toggle" type="button" id="dropdownMenuButton${subtask.id}" data-bs-toggle="dropdown" aria-expanded="false"></button>
+                                    <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton${subtask.id}">
+                                        <li><button class="dropdown-item edit-subtask-btn" data-subtask-id="${subtask.id}" data-subtask-title="${subtask.title}">Edit</button></li>
+                                        <li><button class="dropdown-item delete-subtask-btn" data-subtask-id="${subtask.id}">Delete</button></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+
+                var taskDescription = task.description.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+                var item = `
+                    <ul class="list-group" id="data-row-${task.id}" data-task-id="${task.id}">
+                        <li class="list-group-item d-flex justify-content-between align-items-center underline-border" data-task-id="${task.id}">
+                            <div class="d-flex align-items-center">
+                                <input type="checkbox" class="me-4 checkmark confetti-checkbox" id="confettiCheckbox${task.id}" data-task-id="${task.id}" ${checked}>
+                                <span class="me-2 edit edit-task-title" data-task-id="${task.id}" data-task-title="${task.title}" data-task-completion-date="${task.completion_date}" data-task-completion-time="${task.completion_time}" data-task-description="${taskDescription}" data-task-completed="${task.completed}" data-bs-toggle="offcanvas" data-bs-target="#sidebarRight" aria-controls="sidebarRight">${task.title}</span>
+                                <span class="ms-4 mobile-hide">${completionDate}</span>
+                                <span class="ms-4 mobile-hide">${completionTime}</span>
+                                <span class="ms-4 mobile-hide">${new Date(task.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <button class="btn btn-link" type="button" id="dropdownMenuButton${task.id}" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="align-middle" data-feather="more-horizontal"></i>
+                                </button>
+                                <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton${task.id}">
+                                    <li>
+                                        <button class="dropdown-item delete" data-task-id="${task.id}">
+                                            <i class="align-middle me-2" data-feather="delete"></i> Delete Task
+                                        </button>
+                                    </li>
+                                    <li>
+                                        <button class="dropdown-item task-title" data-task-id="${task.id}" data-bs-toggle="offcanvas" data-bs-target="#sidebarRight1" aria-controls="sidebarRight1">
+                                            <i class="align-middle me-2" data-feather="book-open"></i> Read Task
+                                        </button>
+                                    </li>
+                                    <li>
+                                        <button class="dropdown-item" data-bs-toggle="modal" data-bs-target="#createSubtaskModal" onclick="setTaskIdForSubtask(${task.id})">
+                                            <i class="align-middle me-2" data-feather="plus-circle"></i> Add Subtask
+                                        </button>
+                                    </li>
+                                    <li>
+                                        <button class="dropdown-item delete-all-subtasks-btn" data-task-id="${task.id}">
+                                            <i class="align-middle me-2 fas fa-fw fa-trash"></i> Delete All Subtasks
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
+                        </li>
+                        <div class="subtasks" id="subtasks-${task.id}">
+                            ${subtasksHtml}
+                        </div>
+                    </ul>
+                `;
+                wrapper.innerHTML += item;
+                
+            });
+
+            // Initialize Sortable.js
+            var sortable = new Sortable(wrapper, {
+                animation: 150,
+                onEnd: function (/**Event*/evt) {
+                    var taskOrder = [];
+                    var sortedTasks = wrapper.querySelectorAll('.list-group');
+                    sortedTasks.forEach(function (taskEl, index) {
+                        taskOrder.push({
+                            id: taskEl.getAttribute('data-task-id'),
+                            position: index + 1
+                        });
+                    });
+                    updateTaskOrder(taskOrder, categoryId);
+                }
+            });
+
+        
+            // Reattach event listeners for tasks
+            reattachTaskEventListeners(tasks, categoryId);
+            attachTaskDeleteAllSubtasksListeners(); 
+            attachSubtaskDeleteListeners();
+            attachSubtaskCheckboxListeners(); 
+            feather.replace();
+
+        })
+        .catch(function(error) {
+            console.log('Error:', error);
+        });
+}
+buildList(categoryId);
+
+// Function to send updated task order to the server
+function updateTaskOrder(taskOrder, categoryId) {
+    const csrftoken = getCookie('csrftoken');  // Get the CSRF token
+
+    fetch(`http://127.0.0.1:7000/api/update-task-order/${categoryId}/`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken'),
+            'X-CSRFToken': csrftoken  // Add the CSRF token here
         },
-        body: JSON.stringify(updatedTasks)
+        body: JSON.stringify({taskOrder: taskOrder})
     })
-    .then(response => {
-        if (response.ok) {
-            return response.json();
-        } else {
-            throw new Error('Failed to save task positions.');
-        }
-    })
+    .then(response => response.json())
     .then(data => {
-        if (data.success) {
-            console.log('Task positions saved successfully!');
-            alert('Task positions have been saved.');
-        } else {
-            console.error('Failed to save task positions.');
+        console.log('Task order updated:', data);
+    })
+    .catch(error => {
+        console.error('Error updating task order:', error);
+    });
+}
+
+
+
+
+
+
+
+
+
+
+function fetchCategoryDetails(categoryId) {
+    var url = `http://127.0.0.1:7000/api/category-details/${categoryId}/`;
+
+    fetch(url)
+        .then((response) => response.json())
+        .then(function(data) {
+            console.log('Category Details:', data);
+
+            // Set category name and creation date in the HTML
+            document.getElementById('category-header').innerText = data.name;
+
+            // Format the creation date in a readable format
+            var createdAt = new Date(data.created_at);
+            var formattedDate = createdAt.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+
+            document.getElementById('category-created-at').innerText = `Created on: ${formattedDate}`;
+        })
+        .catch(function(error) {
+            console.error('Error fetching category details:', error);
+        });
+}
+
+//-------------------------------------------------------------------------
+// ------------------- 2. Main Task C.R.U.D Operations -----------------------
+// ----These functions handle creating, updating, and deleting tasks.------
+//-------------------------------------------------------------------------
+// Editing individual tasks
+function editItem(task) {
+    console.log('Editing task:', task);
+
+    // Populate the form fields with task data
+    document.getElementById('title').value = task.title;
+    document.getElementById('completion_date').value = task.completion_date || '';
+    document.getElementById('completion_time').value = task.completion_time || '';
+
+    // Use TinyMCE's API to set the content for the description
+    if (tinymce.get('description')) {
+        tinymce.get('description').setContent(task.description || '');
+    } else {
+        document.getElementById('description').value = task.description || '';
+    }
+    
+    // Add an ID to track that we are editing a task
+    document.getElementById('form-wrapper').setAttribute('data-edit-id', task.id);
+}
+
+// Function to display task details in read-only mode
+function displayTaskDetail(taskId) {
+    var url = `http://127.0.0.1:7000/api/task-detail/${taskId}/`;
+
+    fetch(url)
+        .then((resp) => resp.json())
+        .then(function(data) {
+            var taskDetailContainer = document.getElementById('task-detail-container');
+            if (taskDetailContainer) {
+                taskDetailContainer.innerHTML = `
+                    <h2><b>${data.title}</b></h2>
+                    <p>Created: ${new Date(data.created_at).toLocaleString()}</p>
+                    <p>
+                        <svg style="margin-right: 8px;" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-calendar-event" viewBox="0 0 16 16">
+                            <path d="M11 6.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5z"/>
+                            <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/>
+                        </svg> ${data.completion_date}
+                    </p>
+                    <p>
+                        <svg style="margin-right: 8px;" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clock-history" viewBox="0 0 16 16">
+                            <path d="M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0z"/>
+                            <path d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5"/>
+                        </svg> ${data.completion_time}
+                    </p>
+                    <p>
+                        <svg style="margin-right: 8px;" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-up-square" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd" d="M15 2a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1zM0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm8.5 9.5a.5.5 0 0 1-1 0V5.707L5.354 7.854a.5.5 0 1 1-.708-.708l3-3a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 5.707z"/>
+                        </svg> ${new Date(data.updated_at).toLocaleString()}
+                    </p>
+                    <p>Completed: ${data.completed ? '<svg style="color: green; width: 12px; height: 12px;" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-dot" viewBox="0 0 16 16"><path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3"/></svg>' : '<svg style="color: red;" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-dot" viewBox="0 0 16 16"><path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3"/></svg>'}</p>
+                    <p>${data.description}</p>
+                `;
+                feather.replace();
+            }
+        })
+        .catch(function(error) {
+            console.log('Error:', error);
+        });
+}
+
+// Deleting individual tasks
+function deleteItem(taskId, categoryId) {
+    var url = `http://127.0.0.1:7000/api/task-delete/${taskId}/`;
+    
+    fetch(url, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': csrftoken,
         }
     })
-    .catch(error => console.error('Error:', error));
+    .then(function(response) {
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        console.log(`Task ${taskId} deleted.`);
+        buildList(categoryId);  // Refresh the task list after deleting
+    })
+    .catch(function(error) {
+        console.error('Error:', error);
+    });
+}
+
+// Function to delete all tasks in a category with confirmation pop-up
+function deleteAllItems(categoryId) {
+    // Show a confirmation dialog
+    const confirmation = confirm("Are you sure you want to delete all tasks in this category? This action cannot be undone.");
+
+    // If the user confirms, proceed with the deletion
+    if (confirmation) {
+        console.log(`Deleting all tasks for category ID: ${categoryId}`);
+        var url = `http://127.0.0.1:7000/api/delete-all-tasks-in-category/${categoryId}/`;
+
+        fetch(url, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': csrftoken,  // CSRF token to protect against CSRF attacks
+            }
+        })
+        .then(function(response) {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            console.log('All tasks deleted.');
+            buildList(categoryId);  // Refresh the task list after deleting all tasks
+        })
+        .catch(function(error) {
+            console.error('Error:', error);
+        });
+    } else {
+        console.log('Task deletion canceled by the user.');
+    }
+}
+
+function toggleTaskCompletion(taskId, isCompleted) {
+    var url = `http://127.0.0.1:7000/api/toggle-task-completion/${taskId}/`;
+
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken,
+        },
+        body: JSON.stringify({
+            'completed': isCompleted
+        })
+    })
+    .then(function(response) {
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(function(data) {
+        console.log(`Task ${taskId} completion status updated to:`, data.completed);
+    })
+    .catch(function(error) {
+        console.error('Error updating task completion:', error);
+    });
+}
+
+// Function to update the subtask's completion status
+function updateSubtaskCompletionStatus(subtaskId, isCompleted) {
+    console.log(`Updating subtask completion status for subtask ID: ${subtaskId} to ${isCompleted}`);
+
+    const url = `http://127.0.0.1:7000/api/update-subtask-completion-status/${subtaskId}/`;  // Correct API endpoint for subtasks
+
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken,
+        },
+        body: JSON.stringify({
+            'completed': isCompleted  // Pass the updated completion status
+        })
+    })
+    .then(function(response) {
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(function(data) {
+        console.log('Subtask completion status updated:', data);
+        // Add any UI updates if needed
+    })
+    .catch(function(error) {
+        console.error('Error updating subtask completion status:', error);
+    });
+}
+
+// Function to reset the form
+function resetFormFields() {
+    // Reset the form fields
+    document.getElementById('form-wrapper').reset();
+
+    // If using TinyMCE, reset the description field
+    if (tinymce.get('description')) {
+        tinymce.get('description').setContent('');
+    }
+
+    // Remove the 'data-edit-id' attribute so that it doesn't think you're editing
+    document.getElementById('form-wrapper').removeAttribute('data-edit-id');
+}
+
+// Get the "New Task" buttons by ID and class
+var newTaskButtonTop = document.getElementById('top-add-button');
+var newTaskButtonBottom = document.querySelector('.bottom_add_button');
+
+// Add click event listener to both buttons
+newTaskButtonTop.addEventListener('click', resetFormFields);
+newTaskButtonBottom.addEventListener('click', resetFormFields);
+
+// ----------------------------------------------------------------------------
+// ------------------------- 2. Subtask CRUD Operations --------------------------
+// -These functions deal with the creation, editing, and deletion of subtasks.-
+// ----------------------------------------------------------------------------
+
+function createSubtask(taskId, subtaskTitle) {
+    console.log("Creating subtask for task:", taskId);
+
+    var url = `http://127.0.0.1:7000/api/subtask-create/`;
+
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken,
+        },
+        body: JSON.stringify({
+            'task': taskId,  // Pass the parent task ID
+            'title': subtaskTitle,
+            'completed': false  // Default completion status
+        })
+    })
+    .then(function(response) {
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(function(data) {
+        console.log('Subtask Created:', data);
+
+        // Dynamically add the new subtask to the task's subtasks list without refreshing the entire page
+        var subtasksContainer = document.getElementById(`subtasks-${taskId}`);
+        let newSubtaskHtml = `
+            <div class="subtask-item d-flex align-items-center p-2" style="margin-left: 35px;" data-subtask-id="${data.id}">
+                <input type="checkbox" class="me-2 checkmark subtask-checkbox" id="subtaskCheckbox${data.id}" data-subtask-id="${data.id}" ${data.completed ? 'checked' : ''}>
+                <span>${data.title} createSubtask</span>
+                <div class="dropdown ms-auto" style="padding-right: 15px;">
+                    <button class="btn btn-link dropdown-toggle" type="button" id="dropdownMenuButton${data.id}" data-bs-toggle="dropdown" aria-expanded="false"></button>
+                    <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton${data.id}">
+                        <li><button class="dropdown-item edit-subtask-btn" data-subtask-id="${data.id}" data-subtask-title="${data.title}">Edit</button></li>
+                        <li><button class="dropdown-item delete-subtask-btn" data-subtask-id="${data.id}">Delete</button></li>
+                    </ul>
+                </div>
+            </div>
+        `;
+
+        subtasksContainer.innerHTML += newSubtaskHtml;  // Append the new subtask
+
+        // Reattach event listeners for the new subtask (edit, delete, etc.)
+        attachSubtaskEditListeners();
+        attachSubtaskDeleteListeners();
+        attachSubtaskCheckboxListeners();  // Attach checkbox listeners for new subtasks
+
+    })
+    .catch(function(error) {
+        console.error('Error creating subtask:', error);
+    });
+}
+
+function updateSubtask(subtaskId, updatedTitle) {
+    console.log("Updating subtask:", subtaskId);
+
+    var url = `http://127.0.0.1:7000/api/subtask-update/${subtaskId}/`;
+
+    fetch(url, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken,
+        },
+        body: JSON.stringify({
+            'title': updatedTitle  // Send the updated title
+        })
+    })
+    .then(function(response) {
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(function(data) {
+        console.log('Subtask Updated:', data);
+
+        // Update the UI with the new subtask title
+        const subtaskElement = document.querySelector(`[data-subtask-id="${subtaskId}"] span`);
+        if (subtaskElement) {
+            subtaskElement.textContent = updatedTitle;
+        }
+
+        // Hide the modal after updating
+        const editSubtaskModal = new bootstrap.Modal(document.getElementById('editSubtaskModal'));
+        editSubtaskModal.hide();
+    })
+    .catch(function(error) {
+        console.error('Error updating subtask:', error);
+    });
+}
+
+function deleteSubtask(subtaskId) {
+    const url = `http://127.0.0.1:7000/api/subtask-delete/${subtaskId}/`;
+
+    fetch(url, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken,  // Include CSRF token if needed
+        }
+    })
+    .then(function(response) {
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(function(data) {
+        console.log('Subtask Deleted:', data);
+        // Remove the subtask element from the DOM
+        const subtaskElement = document.querySelector(`[data-subtask-id="${subtaskId}"]`);
+        if (subtaskElement) {
+            subtaskElement.remove();
+        }
+    })
+    .catch(function(error) {
+        console.error('Error deleting subtask:', error);
+    });
+}
+
+function deleteAllSubtasks(taskId) {
+    const url = `http://127.0.0.1:7000/api/delete-all-subtasks/${taskId}/`;
+
+    fetch(url, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken,  // Include CSRF token if necessary
+        }
+    })
+    .then(function(response) {
+        if (response.status === 204) {
+            console.log('All subtasks deleted successfully');
+
+            // Remove all subtasks from the DOM
+            const subtasksContainer = document.getElementById(`subtasks-${taskId}`);
+            if (subtasksContainer) {
+                subtasksContainer.innerHTML = '';  // Clear all subtasks from the UI
+            }
+
+        } else if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+    })
+    .catch(function(error) {
+        console.error('Error deleting all subtasks:', error);
+    });
+}
+
+// -----------------------------------------------------------------
+// -------------- 4. Event Listener Attachments --------------
+// ---- These functions attach the event listeners for various -----
+// --- interactive elements in the UI, like editing, deleting, -----
+// ----------------- and creating subtasks. ------------------------
+// -----------------------------------------------------------------
+
+// Call the function when the page loads or when necessary
+var categoryId = document.getElementById('category-id').value; 
+fetchCategoryDetails(categoryId);
+
+function reattachTaskEventListeners(tasks, categoryId) {
+    // Add event listener to each edit button
+    document.querySelectorAll('.edit-task-title').forEach(button => {
+        button.addEventListener('click', function() {
+            const taskId = this.getAttribute('data-task-id');
+            const task = tasks.find(task => task.id == taskId);
+            editItem(task);  // Call your editItem function
+        });
+    });
+
+    // Add event listener to each delete button
+    document.querySelectorAll('.delete').forEach(button => {
+        button.addEventListener('click', function() {
+            const taskId = this.getAttribute('data-task-id');
+            deleteItem(taskId, categoryId);  // Call your deleteItem function
+        });
+    });
+
+    document.querySelectorAll('.task-title').forEach(button => {
+        button.addEventListener('click', function() {
+            const taskId = this.getAttribute('data-task-id');
+            displayTaskDetail(taskId);  // Call displayTaskDetail with the taskId
+        });
+    });
+
+    // Attach event listeners to task checkboxes
+    document.querySelectorAll('.checkmark').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const taskId = this.getAttribute('data-task-id');
+            const isCompleted = this.checked;
+
+            // Play confetti and sound when marking the task as completed
+            if (isCompleted) {
+                playPopSound();
+                for (let i = 0; i < 30; i++) {
+                    createConfettiParticle(this);
+                }
+            }
+            toggleTaskCompletion(taskId, isCompleted);  // Call your toggleTaskCompletion function
+        });
+    });
+}
+
+function reattachSubtaskEventListeners() {
+    // Reattach event listeners for subtask edit and delete buttons
+    attachSubtaskEditListeners();  // This should attach listeners to `.edit-subtask-btn`
+    attachSubtaskDeleteListeners();  // This should attach listeners to `.delete-subtask-btn`
+}
+
+
+// Set Task ID when opening the subtask modal
+function setTaskIdForSubtask(taskId) {
+    document.getElementById('task-id').value = taskId;
+}
+
+function attachSubtaskEditListeners() {
+    console.log('Attaching subtask edit listeners');
+
+    document.querySelectorAll('.edit-subtask-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const subtaskId = this.getAttribute('data-subtask-id');
+            const subtaskTitle = this.getAttribute('data-subtask-title');
+            
+            // Open the modal and populate it with the subtask data
+            openEditSubtaskModal(subtaskId, subtaskTitle);
+        });
+    });
+}
+
+function attachSubtaskDeleteListeners() {
+    // Attach event listener to subtask delete buttons
+    document.querySelectorAll('.delete-subtask-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const subtaskId = this.getAttribute('data-subtask-id');
+            deleteSubtask(subtaskId);  // Call the delete function
+        });
+    });
+}
+
+function attachTaskDeleteAllSubtasksListeners() {
+    // Attach event listener to the "Delete All Subtasks" buttons
+    document.querySelectorAll('.delete-all-subtasks-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const taskId = this.getAttribute('data-task-id');
+            if (confirm("Are you sure you want to delete all subtasks for this task?")) {
+                deleteAllSubtasks(taskId);
+            }
+        });
+    });
+}
+
+function attachSubtaskCheckboxListeners() {
+    document.querySelectorAll('.subtask-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const subtaskId = this.getAttribute('data-subtask-id');  // Ensure subtaskId is retrieved correctly
+            const isCompleted = this.checked;  // Get the completion status
+
+            if (!subtaskId) {
+                console.error("Subtask ID is missing!");
+                return;
+            }
+
+            // Update the completion status via API
+            updateSubtaskCompletionStatus(subtaskId, isCompleted);
+        });
+    });
+}
+
+function openEditSubtaskModal(subtaskId, subtaskTitle) {
+    // Set the subtask ID and title in the modal fields
+    document.getElementById('edit-subtask-id').value = subtaskId;
+    document.getElementById('edit-subtask-title').value = subtaskTitle;
+
+    // Show the edit modal
+    const editSubtaskModal = new bootstrap.Modal(document.getElementById('editSubtaskModal'));
+    editSubtaskModal.show();
+}
+
+// ------------------------------------------------------------------------
+// ----------------------- Event Listeners for Buttons --------------------
+// ------------------------------------------------------------------------
+// Add event listener to the "Delete All" button
+document.querySelector('.delete-all-btn').addEventListener('click', function() {
+    const categoryId = this.getAttribute('data-category-id');
+    if (categoryId) {
+        deleteAllItems(categoryId);
+    } else {
+        console.error("Category ID not found.");
+    }
+});
+
+// Add event listener to subtask creation buttons
+document.querySelectorAll('.create-subtask-btn').forEach(button => {
+    button.addEventListener('click', function() {
+        const taskId = this.getAttribute('data-task-id');
+
+        // Set the task ID in the modal's hidden input field
+        document.getElementById('task-id').value = taskId;
+    });
+});
+
+
+// ------------------------------------------------------------------------
+// ----------------------- Comfort Functionalities ------------------------
+// ------------------------------------------------------------------------
+// Play pop sound
+function playPopSound() {
+    var audio = document.getElementById('pop-sound');
+    if (audio) {
+        audio.play().catch(function(error) {
+            console.log('Audio play error:', error);
+        });
+    }
+}
+
+// Create confetti particle
+function createConfettiParticle(button) {
+    const confetti = document.createElement('div');
+    confetti.classList.add('confetti');
+    document.body.appendChild(confetti);
+
+    const buttonRect = button.getBoundingClientRect();
+    const x = Math.random() * 400 - 200; // Spread particles within a 400px range horizontally
+    const y = Math.random() * 400 - 200; // Spread particles within a 400px range vertically
+
+    confetti.style.left = `${buttonRect.left + buttonRect.width / 2 + window.scrollX}px`;
+    confetti.style.top = `${buttonRect.top + buttonRect.height / 2 + window.scrollY}px`;
+    confetti.style.backgroundColor = getRandomColor();
+    confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
+    confetti.style.setProperty('--x', `${x}px`);
+    confetti.style.setProperty('--y', `${y}px`);
+    confetti.style.animationDuration = `${Math.random() * 1 + 0.5}s`;
+
+    confetti.addEventListener('animationend', () => {
+        confetti.remove();
+    });
+}
+
+// Get a random color for the confetti particle
+function getRandomColor() {
+    const colors = ['#f2d74e', '#f28c8c', '#4ef2a3', '#4e7af2', '#e74ef2'];
+    return colors[Math.floor(Math.random() * colors.length)];
+}
+
+
+
+// ------------------------------------------------------------------------
+// ----------------------- Form Submission Handling -----------------------
+// - Handles form submissions for creating or updating tasks and subtasks -
+// ------------------------------------------------------------------------
+
+// Form submission logic FOR Create & Edit
+var form = document.getElementById('form-wrapper');
+form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    console.log('Form Submitted (main task)');
+
+    var taskId = form.getAttribute('data-edit-id');  // Check if we are editing
+    var url = taskId ? `http://127.0.0.1:7000/api/task-update/${taskId}/` : `http://127.0.0.1:7000/api/task-create/`;
+    var method = taskId ? 'POST' : 'POST'; // Adjust if your update endpoint requires PUT or POST
+
+    var title = document.getElementById('title').value;
+    var completion_date = document.getElementById('completion_date').value;
+    var completion_time = document.getElementById('completion_time').value;
+    
+    // Retrieve the content from TinyMCE instead of directly from the textarea
+    var description = tinymce.get('description').getContent() || '';
+    
+    var categoryId = document.getElementById('category-id').value;
+
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-type': 'application/json',
+            'X-CSRFToken': csrftoken,
+        },
+        body: JSON.stringify({
+            'title': title,
+            'completion_date': completion_date || null,
+            'completion_time': completion_time || null,
+            'description': description,  // Use the TinyMCE content
+            'category': categoryId
+        })
+    })
+    .then(function(response) {
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(function(data) {
+        console.log('Task Saved:', data);
+        buildList(categoryId);  // Refresh the task list
+        form.reset(); 
+
+        // Reset TinyMCE content
+        tinymce.get('description').setContent('');
+
+        form.removeAttribute('data-edit-id');  // Clear edit state
+    })
+    .catch(function(error) {
+        console.error('Error:', error);
+    });
+});
+
+// Handle subtask creation when the modal form is submitted
+document.getElementById('subtask-form').addEventListener('submit', function(e) {
+    e.preventDefault();  // Prevent the default form submission behavior
+
+    const taskId = document.getElementById('task-id').value;  // Get the task ID from the hidden field
+    const subtaskTitle = document.getElementById('subtask-title').value;  // Get the subtask title
+
+    if (!taskId) {
+        alert('Task ID is missing!');
+        return;
+    }
+
+    if (subtaskTitle.trim() === "") {
+        alert('Subtask title cannot be empty');
+        return;
+    }
+
+    createSubtask(taskId, subtaskTitle); 
+
+    // Hide the modal after form submission
+    const subtaskModal = new bootstrap.Modal(document.getElementById('createSubtaskModal'));
+    subtaskModal.hide();
+
+    // Delay the reset slightly to ensure the modal is fully hidden
+    setTimeout(() => {
+        document.getElementById('subtask-form').reset();
+    }, 100);  // 300ms should be enough to ensure the modal is closed
+});
+
+document.getElementById('subtask-edit-form').addEventListener('submit', function(e) {
+    e.preventDefault();  // Prevent the default form submission
+
+    const subtaskId = document.getElementById('edit-subtask-id').value;  // Get the subtask ID
+    const updatedTitle = document.getElementById('edit-subtask-title').value;  // Get the updated title
+
+    if (!updatedTitle.trim()) {
+        alert('Subtask title cannot be empty');
+        return;
+    }
+
+    updateSubtask(subtaskId, updatedTitle);  // Call the function to update the subtask
 });
 
 

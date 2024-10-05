@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse, HttpResponseRedirect
 from rest_framework import status
 from django.contrib.auth.models import User
@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Max
+from django.db import transaction
 
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -14,9 +15,11 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .serializer import TaskCategorySerializer, TaskSerializer, SubTaskSerializer, ProfileSerializer, NotificationsSerializer, UserInterest  
-from .models import TaskCategory, Task, SubTask, Profile, Notifications, Interest, TaskAnalysis
+from .serializer import TaskCategorySerializer, TaskSerializer, SubTaskSerializer, ProfileSerializer, NotificationsSerializer, UserInterest, JurnalSerializer 
+from .models import TaskCategory, Task, SubTask, Profile, Notifications, Interest, TaskAnalysis, Jurnal
 import openai
+import logging
+logger = logging.getLogger(__name__)
 
 openai.api_key = settings.OPENAI_API_KEY  # Replace with your actual OpenAI API key
 
@@ -42,6 +45,12 @@ def apiOverview(request):
         'Sbtask Update': '/subtask-update/<int:subtask_id>/',
         'Subtask Delete': '/delete-subtask/<int:pk>/',
         'Subtask Updatem Completion Status': '/update-subtask-completion-status/<int:pk>/',
+        ## Jurnal
+        'Jurnal List': '/jurnal-list/',
+        'Jurnal Detail': '/jurnal-detail/<str:pk>/',
+        'Jurnal Create': '/jurnal-create/',
+        'Jurnal Update': '/jurnal-update/<str:pk>/',
+        'Jurnal Delete': '/jurnal-delete/<str:pk>/',
         ## Calender
         'Calender': '/calendar/',
         ## Profile
@@ -58,7 +67,9 @@ def apiOverview(request):
     }
     return Response(api_urls)
 
-## TASK PROJECT CATEGORY C.R.U.D
+## -----------------------------------------------------------------------
+## ----------------- TASK PROJECT CATEGORY C.R.U.D -----------------------
+## -----------------------------------------------------------------------
 @api_view(['GET'])
 def task_project(request):
     categories = TaskCategory.objects.filter(owner=request.user)
@@ -113,17 +124,33 @@ def delete_all_tasks_in_category(request, category_id):
     
     tasks.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+ 
 
-## MAIN TASK C.R.U.D 
+## -----------------------------------------------------------------------
+## ------------------------ MAIN TASK C.R.U.D ----------------------------
+## -----------------------------------------------------------------------
+@api_view(['GET'])
+def category_details_api(request, pk):
+    category = get_object_or_404(TaskCategory, id=pk, owner=request.user)
+    
+    # Return category details as JSON
+    data = {
+        'name': category.name,
+        'created_at': category.created_at,
+    }
+    
+    return Response(data)
+
 @api_view(['GET'])
 def task_list(request, category_id):
-    # Get the category object to include in the response
+    print(f"Received request for category_id: {category_id}")  # Log the category ID
+
     category = TaskCategory.objects.get(id=category_id, owner=request.user)
     
-    # Fetch tasks for the category, initially ordered by 'position'
-    tasks = Task.objects.filter(owner=request.user, category=category_id).order_by('-position')
-    
-    # Serialize the tasks and category data
+    # Sort tasks by position in ascending order (smallest position first),
+    # and within the same position, show the most recent tasks on top
+    tasks = Task.objects.filter(owner=request.user, category=category_id).order_by('position', '-created_at')
+
     serializer = TaskSerializer(tasks, many=True)
     category_serializer = TaskCategorySerializer(category)
     
@@ -139,45 +166,57 @@ def task_detail(request, pk):
     serializer = TaskSerializer(tasks, many=False)
     return Response(serializer.data)
 
-
 @api_view(['POST'])
 def task_create(request):
-    data = request.data
-    owner = request.user
-    category = TaskCategory.objects.get(id=data['category'])
+    try:
+        data = request.data
+        owner = request.user
+        category = TaskCategory.objects.get(id=data['category'])
 
-    # Get the highest current position in the category and add 1
-    max_position = Task.objects.filter(category=category, owner=owner).aggregate(Max('position'))['position__max']
-    new_position = (max_position or 0) + 1
+        # Get the highest current position in the category and add 1
+        max_position = Task.objects.filter(category=category, owner=owner).aggregate(Max('position'))['position__max']
+        new_position = (max_position or 0) + 1
 
-    task = Task.objects.create(
-        category=category,
-        title=data['title'],
-        completed=data.get('completed', False),
-        completion_date=data.get('completion_date'),
-        completion_time=data.get('completion_time'),
-        description=data.get('description', ''),
-        position=new_position,
-        owner=owner
-    )
+        task = Task.objects.create(
+            category=category,
+            title=data['title'],
+            completed=data.get('completed', False),
+            completion_date=data.get('completion_date'),
+            completion_time=data.get('completion_time'),
+            description=data.get('description', ''),
+            position=new_position,
+            owner=owner
+        )
 
-    serializer = TaskSerializer(task, many=False)
-    return Response(serializer.data)
+        serializer = TaskSerializer(task, many=False)
+        return Response(serializer.data)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+@api_view(['POST'])
+def toggle_task_completion(request, pk):
+    task = get_object_or_404(Task, id=pk, owner=request.user)
+    
+    # Update the task's 'completed' status based on the request
+    task.completed = request.data.get('completed', False)
+    task.save()
+
+    return Response({'message': 'Task updated successfully', 'completed': task.completed}, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
 def task_update(request, pk):
     try:
         task = Task.objects.get(id=pk)
     except Task.DoesNotExist:
-        return Response(status=status.HTTP_404_NOT_FOUND)
+        return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
     
     serializer = TaskSerializer(instance=task, data=request.data, partial=True)  # Allow partial updates
     
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data)
-    
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['DELETE'])
 def task_delete(request, pk):
@@ -189,12 +228,44 @@ def task_delete(request, pk):
     task.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
-## SUBTASK C.R.U.D 
+@api_view(['DELETE'])
+def delete_all_tasks_in_category(request, category_id):
+    try:
+        # Fetch all tasks for the category
+        tasks = Task.objects.filter(category_id=category_id)
+        
+        if not tasks.exists():
+            return Response({"message": "No tasks found for this category."}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Delete all tasks in the category
+        tasks.delete()
+        return Response({"message": "All tasks deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
+    
+    except TaskCategory.DoesNotExist:
+        return Response({"message": "Category not found."}, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['POST'])
+def update_task_order(request, category_id):
+    task_order = request.data.get('taskOrder', [])
+    for task_data in task_order:
+        task = Task.objects.get(id=task_data['id'], category_id=category_id)
+        task.position = task_data['position']
+        task.save()
+    
+    return Response({'message': 'Task order updated successfully'})
+
+## -----------------------------------------------------------------------
+## ------------------------- SUBTASK C.R.U.D -----------------------------
+## -----------------------------------------------------------------------
 @api_view(['POST'])
 def subtask_create(request):
-    data = request.data
-    parent_task = Task.objects.get(id=data['task'])
-
+    try:
+        data = request.data
+        logger.info("Subtask create request data: %s", data)  # Log incoming data
+        parent_task = Task.objects.get(id=data['task'])
+    except Task.DoesNotExist:
+        return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
+    
     # Check if subtask with the same title and task already exists
     existing_subtask = SubTask.objects.filter(task=parent_task, title=data['title']).first()
     if existing_subtask:
@@ -212,6 +283,7 @@ def subtask_create(request):
     serializer = SubTaskSerializer(subtask, many=False)
     return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+
 @api_view(['POST'])
 def update_subtask_completion_status(request, pk):
     try:
@@ -226,16 +298,6 @@ def update_subtask_completion_status(request, pk):
     serializer = SubTaskSerializer(subtask, many=False)
     return Response(serializer.data)
 
-@api_view(['DELETE'])
-def delete_subtask(request, pk):
-    try:
-        subtask = SubTask.objects.get(id=pk)
-    except SubTask.DoesNotExist:
-        return Response(status=status.HTTP_404_NOT_FOUND)
-    
-    subtask.delete()
-    return Response(status=status.HTTP_204_NO_CONTENT)
-
 @api_view(['PUT'])
 def subtask_update(request, subtask_id):
     try:
@@ -249,20 +311,104 @@ def subtask_update(request, subtask_id):
     except SubTask.DoesNotExist:
         return Response({'status': 'error', 'message': 'Subtask not found'}, status=404)
 
-## SORTABLEJS - (https://sortablejs.github.io/Sortable/)
-@api_view(['POST'])
-def update_task_positions(request):
-    data = request.data
-    for task_data in data:
-        task_id = task_data['id']
-        new_position = task_data['position']
-        # Assuming `owner` is tied to the user managing these tasks
-        task = Task.objects.get(id=task_id, owner=request.user)
-        task.position = new_position
-        task.save()
-    return Response({'success': True}, status=status.HTTP_200_OK)
+@api_view(['DELETE'])
+def subtask_delete(request, subtask_id):
+    try:
+        subtask = SubTask.objects.get(id=subtask_id)
+        subtask.delete()
+        return Response({'message': 'Subtask deleted successfully'}, status=status.HTTP_200_OK)
+    except SubTask.DoesNotExist:
+        return Response({'message': 'Subtask not found'}, status=status.HTTP_404_NOT_FOUND)
 
-## AI FUNCTIONALITY 
+
+@api_view(['DELETE'])
+def delete_all_subtasks(request, task_id):
+    try:
+        # Fetch the task by ID
+        parent_task = Task.objects.get(id=task_id, owner=request.user)
+        
+        # Fetch and delete all subtasks related to the task
+        SubTask.objects.filter(task=parent_task).delete()
+
+        return Response({'success': True, 'message': 'All subtasks deleted'}, status=status.HTTP_204_NO_CONTENT)
+    
+    except Task.DoesNotExist:
+        return Response({'success': False, 'message': 'Task not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    except Exception as e:
+        return Response({'success': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+## -----------------------------------------------------------------------
+## ------------------------- JURNAL C.R.U.D ------------------------------
+## -----------------------------------------------------------------------
+@api_view(['GET'])
+def jurnal_list(request):
+    # Order first by position (if set), then by created_at in descending order for unpositioned items
+    jurnals = Jurnal.objects.filter(owner=request.user).order_by('position', '-created_at')
+    serializer = JurnalSerializer(jurnals, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+def jurnal_detail(request, pk):
+    jurnal = Jurnal.objects.get(id=pk)
+    serializer = JurnalSerializer(jurnal, many=False)
+    return Response(serializer.data)
+
+@api_view(['POST'])
+def  jurnal_create(request):
+    serializer = JurnalSerializer(data=request.data)
+
+    if serializer.is_valid():
+        serializer.save(owner=request.user)
+
+    return Response(serializer.data, status=201)
+
+@api_view(['POST'])
+def jurnal_update(request, pk):
+    jurnal = Jurnal.objects.get(id=pk)
+    serializer = JurnalSerializer(instance=jurnal, data=request.data)
+
+    if serializer.is_valid():
+        serializer.save()
+
+    return Response(serializer.data)
+
+@api_view(['DELETE'])
+def jurnal_delete(request, pk):
+    jurnal = Jurnal.objects.get(id=pk)
+    jurnal.delete()
+
+    return Response('jurnal succesefully delete!')
+
+## -----------------------------------------------------------------------
+## ------ SORTABLEJS - (https://sortablejs.github.io/Sortable/) ----------
+## -----------------------------------------------------------------------
+
+@api_view(['POST'])
+def update_jurnal_order(request):
+    data = request.data
+
+    failed_updates = []
+    
+    for item in data:
+        try:
+            # Ensure you update only the items that belong to the logged-in user
+            jurnal = Jurnal.objects.get(id=item['id'], owner=request.user)
+            jurnal.position = item['position']
+            jurnal.save()
+        except Jurnal.DoesNotExist:
+            failed_updates.append(item['id'])  # Collect the IDs of failed updates
+    
+    if failed_updates:
+        return Response({"message": "Order updated with some errors.", "failed_updates": failed_updates}, status=400)
+    
+    return Response({"message": "Order updated successfully."})
+
+## -----------------------------------------------------------------------
+## -------------------------- AI FUNCTIONALITY  --------------------------
+## -----------------------------------------------------------------------
 # Example using OpenAI to break down tasks
 def breakdown_task(request, task_id):
     print("API called for task:", task_id)  # Debug line
@@ -429,7 +575,9 @@ def get_task_analyses(request, category_id):
     # Return the existing analyses as a JSON response
     return JsonResponse({'analyses': analysis_data, 'status': 'Analysis retrieved successfully'})
 
-## SEARCH BAR
+## -----------------------------------------------------------------------
+## ----------------------------- SEARCH BAR  -----------------------------
+## -----------------------------------------------------------------------
 @api_view(['GET'])
 def search_tasks(request):
     query = request.GET.get('q', None)
@@ -497,7 +645,9 @@ def user_interests_list(request):
     }
     return Response(response_data)
 
-## NOTIFICATIONS
+## -----------------------------------------------------------------------
+## ---------------------------- NOTIFICATIONS  ---------------------------
+## -----------------------------------------------------------------------
 @api_view(['GET'])
 def notifications(request):
     notifications = Notifications.objects.all()

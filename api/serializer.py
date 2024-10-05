@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import TaskCategory, Task, SubTask, Profile, Notifications, Interest
+from .models import TaskCategory, Task, SubTask, Profile, Notifications, Interest, Jurnal
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -62,6 +62,11 @@ class TaskSerializer(serializers.ModelSerializer):
             return expanded_fields + self.Meta.extra_fields
         else:
             return expanded_fields
+
+class JurnalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Jurnal
+        fields = '__all__'
 
 class NotificationsSerializer(serializers.ModelSerializer):
     class Meta:

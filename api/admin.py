@@ -1,6 +1,6 @@
 # admin.py
 from django.contrib import admin
-from .models import TaskCategory, Task, SubTask, Profile, Goal, Notifications, TaskAnalysis
+from .models import TaskCategory, Task, SubTask, Profile, Goal, Notifications, TaskAnalysis,  Jurnal
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 
@@ -19,6 +19,7 @@ class UserAdmin(BaseUserAdmin):
 admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
 admin.site.register(TaskAnalysis)
+admin.site.register(Jurnal)
 
 @admin.register(Goal)
 class GoalAdmin(admin.ModelAdmin):

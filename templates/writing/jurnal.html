@@ -1,0 +1,323 @@
+{% extends '../base.html' %}
+{% load static %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tinymce/7.1.2/tinymce.min.js" referrerpolicy="origin"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
+<script>
+    tinymce.init({
+        selector: 'textarea#description',
+        height: 900,
+        plugins: 'advlist autolink lists link image charmap print preview hr anchor pagebreak',
+        toolbar_mode: 'floating',
+        skin: 'oxide-dark',
+        content_css: 'dark',
+        content_style: `
+            body {
+                background-color: #222F3E;
+                color: #ffffff;
+                border: none; 
+            }
+            .mce-content-body {
+                background-color: #222F3E !important;
+                color: #ffffff !important;
+                border: none !important; 
+            }
+        `
+    });
+</script>
+<style>
+    .table {
+        background-color: transparent; /* Table transparency */
+        border-collapse: collapse;
+    }
+
+    .table th,
+    .table td {
+        padding: 5px 10px; /* Reduce padding */
+        border: none; /* Remove borders */
+        background-color: transparent;
+        color: white;
+    }
+
+    .table-hover tbody tr:hover {
+        background-color: rgba(0, 0, 0, 0.1); /* Slight darkening on hover */
+    }
+
+    .sortable-chosen {
+        background-color: transparent; /* Background for chosen row during drag */
+        transition: background-color 0.2s ease;
+    }
+
+    .sortable-ghost {
+        opacity: 0.4; /* Ghost element transparency during drag */
+    }
+    .fixed-button {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 100; /* Lower z-index for the button */
+    }
+
+    .offcanvas {
+        z-index: 1055; /* Default z-index for Bootstrap offcanvas is 1055, ensure it's higher than the button */
+    }
+
+/* Reserve space for the delete button and hide it visually */
+.jurnal-wrapper .delete-btn {
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.jurnal-wrapper:hover .delete-btn {
+    visibility: visible;
+    opacity: 1;
+}
+/* CSS to align the date to the right */
+table th:nth-child(2), table td:nth-child(2) {
+    text-align: right;
+    width: 100px; /* You can adjust this value based on your preference */
+}
+
+
+</style>
+
+<div class="conatiner">
+    <h2 style="font-weight: bold; color: white;"><i class="align-middle me-2 fas fa-fw fa-book-open"></i> Jurnal</h2>
+    <table class="table table-hover" id="sortable-table">
+        <thead>
+            <tr>
+                <th></th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="list-wrapper-jurnal"> <!-- Use this as the wrapper for the list -->
+            <!-- Rows will be dynamically generated here -->
+        </tbody>
+    </table>
+</div>
+  
+
+<!-- Sidebar Content Create Task -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="sidebarRight" aria-labelledby="sidebarLabel">
+    <div class="offcanvas-header">
+      <h5 id="sidebarLabel">Create Tasks</h5>
+      <a type="button" class="text-reset" data-bs-dismiss="offcanvas" aria-label="Close">
+        <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" fill="currentColor" class="bi bi-caret-right" viewBox="0 0 16 16">
+            <path d="M6 12.796V3.204L11.481 8zm.659.753 5.48-4.796a1 1 0 0 0 0-1.506L6.66 2.451C6.011 1.885 5 2.345 5 3.204v9.592a1 1 0 0 0 1.659.753"/>
+        </svg>
+      </a>
+    </div>
+    <div class="offcanvas-body">
+        <div class="container-fluid full-height">
+            <form id="form-wrapper-jurnal" class="mb-3">
+                <input type="hidden" id="user-id" value="{{ user.id }}">
+                <div class="input-group mb-3">
+                    <input id="title" type="text" class="form-control" name="title" placeholder="Title" required>
+                </div>
+                <div class="mb-3">
+                    <textarea id="description" class="form-control" name="description" placeholder="Description" rows="3"></textarea>
+                </div>
+                <div class="button-wrapper">
+                    <div class="d-flex">
+                        <button type="submit" class="btn btn-primary form-control" style="margin-right: 4px;">
+                            <i class="align-middle me-2 fas fa-fw fa-plus"></i>Add Task
+                        </button>
+                        <button type="butdton" class="text-reset btn btn-outline-danger" data-bs-dismiss="offcanvas" aria-label="Close">Close</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div> 
+</div>
+  
+<!-- Button to open the offcanvas -->
+<button class="btn btn-secondary fixed-button" type="button" id="openOffcanvasButton" data-bs-toggle="offcanvas" data-bs-target="#sidebarRight" aria-controls="sidebarRight">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-plus"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+</button>
+
+<script>
+    // Function to get the CSRF token (Django-specific security requirement)
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    var csrftoken = getCookie('csrftoken');
+
+    var activeItme = null
+
+    // Function to build the table list
+    buildList();
+
+    function buildList() {
+        var wrapper = document.getElementById('list-wrapper-jurnal'); // Correctly select the table body
+        wrapper.innerHTML = '';
+        var url = 'http://127.0.0.1:7000/api/jurnal-list/'; // API endpoint
+
+        fetch(url)
+        .then((resp) => resp.json())
+        .then(function(data) {
+            console.log('Data:', data); // Check data in the console
+
+            // Clear the wrapper to avoid duplicating content
+            wrapper.innerHTML = '';
+
+            var list = data;
+            for (var i = 0; i < list.length; i++) {
+                var item = `
+                    <tr id="data-row-${list[i].id}" class="jurnal-wrapper" data-id="${list[i].id}">
+                        <td>
+                            <div class="title-wrapper" style="display: flex; align-items: center;">
+                                <span class="edit" id="openOffcanvasButton" data-bs-toggle="offcanvas" data-bs-target="#sidebarRight" aria-controls="sidebarRight">${list[i].title}</span>
+                                <button class="btn btn-light btn-sm delete-btn" style="margin-left: 10px;" onclick="deleteJurnal(${list[i].id})"><i class="align-middle me-2 far fa-fw fa-trash-alt"></i></button>
+                            </div>
+                        </td>
+                        <td>${new Date(list[i].created_at).toLocaleDateString()}</td>
+                    </tr>
+                `;
+                wrapper.innerHTML += item;
+
+            
+            }
+
+            for (var i in list) {
+                // Attach click listener for the edit button
+                let editBtn = document.getElementsByClassName('edit')[i];
+
+
+                editBtn.addEventListener('click', (function(item) {
+                    return function(){
+                        editJurnal(item);
+                    }
+                })(list[i]))
+            }
+
+            // Reapply the hover effect
+            attachHoverEffect();
+        })
+        .catch(function(error) {
+            console.log('Error fetching data:', error); // Handle any fetch errors
+        });
+    }
+
+    // Create Jurnal
+    // Create or Update Jurnal
+    var form = document.getElementById('form-wrapper-jurnal');
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        console.log('form submitted (create jurnal)');
+        var url = 'http://127.0.0.1:7000/api/jurnal-create/';
+
+        if (activeItme != null) {
+            url = `http://127.0.0.1:7000/api/jurnal-update/${activeItme.id}/`; // Remove the extra space
+            activeItme = null;
+        }
+
+        var title = document.getElementById('title').value;
+        var description = tinymce.get('description').getContent();
+        
+        var data = {
+            'title': title,
+            'description': description, 
+        };
+
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-type': 'application/json',
+                'X-CSRFToken': csrftoken,
+            },
+            body: JSON.stringify(data)
+        })
+        .then(function(response) {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();  // Parse the JSON response
+        })
+        .then(function(data) {
+            console.log('Success:', data);  // Check if the server returned success
+            buildList();  // Rebuild the list after the new entry is added
+        })
+        .catch(function(error) {
+            console.error('Error:', error);
+        });
+    });
+
+
+    // Edit Jurnal
+    function editJurnal(item) {
+        console.log('jurnal item clicked (edit)', item);
+        activeItme = item;
+        
+        // Set the title value
+        document.getElementById('title').value = activeItme.title;
+        
+        // Set the TinyMCE content for description
+        tinymce.get('description').setContent(activeItme.description); // Use TinyMCE API to set content
+    }
+
+
+    // Function to add hover effect
+    function attachHoverEffect() {
+        var rows = document.querySelectorAll('.jurnal-wrapper');
+        
+        rows.forEach(function(row) {
+            row.addEventListener('mouseenter', function() {
+                var deleteBtn = row.querySelector('.delete-btn');
+                deleteBtn.style.display = '';
+            });
+
+            row.addEventListener('mouseleave', function() {
+                var deleteBtn = row.querySelector('.delete-btn');
+                deleteBtn.style.display = 'none';
+            });
+        });
+    }
+
+    // Sort The Position
+    var sortable = new Sortable(document.querySelector("#list-wrapper-jurnal"), {
+        animation: 150,
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        onEnd: function (evt) {
+            var orderedIds = [];
+            var rows = document.querySelectorAll('#list-wrapper-jurnal tr');
+            
+            rows.forEach(function (row, index) {
+                var itemId = row.getAttribute('data-id');
+                orderedIds.push({id: itemId, position: index + 1});
+            });
+
+            // Send the new order to the backend
+            fetch('http://127.0.0.1:7000/api/jurnal-update-order/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify(orderedIds)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Updated order:', data);
+            })
+            .catch(error => {
+                console.log('Error:', error);
+            });
+        }
+    });
+</script>
+{% endblock %}

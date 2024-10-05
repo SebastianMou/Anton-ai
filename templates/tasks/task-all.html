@@ -1,0 +1,198 @@
+{% extends '../base.html' %}
+{% load static %}
+<title>{% block title %}Anton To Do.{% endblock %}</title>
+{% block content %}
+<audio id="pop-sound" src="{% static 'sound affect/happy-pop-2-185287.mp3' %}"></audio>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tinymce/7.1.2/tinymce.min.js" referrerpolicy="origin"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
+
+<script>
+    tinymce.init({
+        selector: 'textarea#description',
+        height: 900,
+        plugins: 'advlist autolink lists link image charmap print preview hr anchor pagebreak',
+        toolbar_mode: 'floating',
+        skin: 'oxide-dark',
+        content_css: 'dark',
+        content_style: `
+            body {
+                background-color: #222F3E;
+                color: #ffffff;
+                border: none; 
+            }
+            .mce-content-body {
+                background-color: #222F3E !important;
+                color: #ffffff !important;
+                border: none !important; 
+            }
+        `
+    });
+</script>
+<!-- <button id="confirm-positions-btn">update</button> -->
+<div class="dropup">
+    <button class="btn btn-secondary fixed-button" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
+        <i data-feather="plus"></i>
+    </button>
+    <ul class="dropdown-menu" id="add-menu" aria-labelledby="dropdownMenuButton1" style="background-color: #222e3c;">
+        <a class="dropdown-item" id="openPopupBtn">
+            <i class="align-middle me-2 fas fa-fw fa-brain"></i> Anton Optimize
+        </a>
+        <li>
+            <a class="dropdown-item" id="fetch-data-button" data-category-id="{{ category.id }}" href="#" data-bs-toggle="offcanvas" data-bs-target="#sidebarRight2" aria-controls="sidebarRight2">
+                <i class="align-middle me-2 far fa-fw fa-clipboard"></i> Anton Thoughts
+            </a>
+        </li>
+        <li><a class="dropdown-item" href="#"><i class="align-middle me-2 far fa-fw fa-file-pdf"></i> PDF</a></li>
+        <li><a class="dropdown-item" href="#" data-bs-toggle="offcanvas" data-bs-target="#sidebarRight" aria-controls="sidebarRight"><i class="align-middle me-2 fas fa-fw fa-plus"></i> Add Task</a></li>
+    </ul>
+</div>
+<!-- Spinner for loading screen -->
+<div class="spinner" id="loadingSpinner" style="display: none;"></div>
+
+<div class="container-fluid p-0">
+    <div class="card">
+        <div class="card-header text-center bg-primary text-white">
+            <h1 id="category-header">Category Name</h1>
+
+            <p style="color: white;" id="category-created-at"></p>
+            <input type="hidden" id="category-id" value="{{ pk }}">
+        </div>
+        
+        <div class="d-flex">
+            <script>
+                var categoryId = {{ pk }};
+            </script>
+            <button class="btn btn-danger" style="border-radius: 0px;" onclick="deleteAllTasksInCategory(categoryId)"><i class="align-middle me-2" data-feather="trash"></i></button>
+
+            <button class="btn btn-primary top_add_button ms-auto" data-bs-toggle="offcanvas" data-bs-target="#sidebarRight" aria-controls="sidebarRight"><i style="color: #fff;" data-feather="plus"></i></button>
+            <button class="btn btn-outline-secondary" id="aiAnalysisButton">AI</button>
+        </div>
+        
+        <div class="card-body">
+            <div id="list-wrapper" class="list-group">
+                <!-- These are all the tasks -->
+            </div>
+            <button class="btn btn-primary bottom_add_button" data-bs-toggle="offcanvas" data-bs-target="#sidebarRight" aria-controls="sidebarRight"><i data-feather="plus"></i> New Task</button>
+        </div>
+    </div>
+</div>
+
+<!-- Sidebar Content Create Task -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="sidebarRight" aria-labelledby="sidebarLabel">
+    <div class="offcanvas-header">
+    <h5 id="sidebarLabel">Create Tasks</h5>
+    <a type="butdton" class="text-reset" data-bs-dismiss="offcanvas" aria-label="Close">
+        <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" fill="currentColor" class="bi bi-caret-right" viewBox="0 0 16 16">
+            <path d="M6 12.796V3.204L11.481 8zm.659.753 5.48-4.796a1 1 0 0 0 0-1.506L6.66 2.451C6.011 1.885 5 2.345 5 3.204v9.592a1 1 0 0 0 1.659.753"/>
+        </svg>
+    </a>
+    </div>
+    <div class="offcanvas-body">
+        <div class="container-fluid full-height">
+            <form id="form-wrapper" class="mb-3">
+                <input type="hidden" id="user-id" value="{{ user.id }}">
+                <div class="input-group mb-3">
+                    <input id="title" type="text" class="form-control" name="title" placeholder="Title" required>
+                </div>
+                <div class="input-group mb-3">
+                    <input id="completion_date" type="date" class="form-control" name="completion_date" placeholder="Completion Date">
+                </div>
+                <div class="input-group mb-3">
+                    <input id="completion_time" type="time" class="form-control" name="completion_time" placeholder="Completion Time">
+                </div>
+                <div class="mb-3">
+                    <textarea id="description" class="form-control" name="description" placeholder="Description" rows="3"></textarea>
+                </div>
+                <div class="button-wrapper">
+                    <div class="d-flex">
+                        <button type="submit" class="btn btn-primary form-control" style="margin-right: 4px;">
+                            <i class="align-middle me-2 fas fa-fw fa-plus"></i>Add Task
+                        </button>
+                        <button type="butdton" class="text-reset btn btn-outline-danger" data-bs-dismiss="offcanvas" aria-label="Close">Close</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div> 
+</div>
+
+<!-- Sidebar Content task detail -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="sidebarRight1" aria-labelledby="sidebarLabel">
+    <div class="offcanvas-header">
+        <h5 id="sidebarLabel"><i class="align-middle me-2" data-feather="book-open"></i> Read</h5>
+        <a type="button" class="text-reset" data-bs-dismiss="offcanvas" aria-label="Close">
+            <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" fill="currentColor" class="bi bi-caret-right" viewBox="0 0 16 16">
+                <path d="M6 12.796V3.204L11.481 8zm.659.753 5.48-4.796a1 1 0 0 0 0-1.506L6.66 2.451C6.011 1.885 5 2.345 5 3.204v9.592a1 1 0 0 0 1.659.753"/>
+            </svg>
+        </a>
+    </div>
+    <div class="offcanvas-body">
+        <div class="container-fluid full-height" id="task-detail-container">
+            <!-- load task detail here -->
+        </div>
+    </div>
+</div>
+
+<!-- Sidebar Content anton data -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="sidebarRight2" aria-labelledby="sidebarLabel">
+    <div class="offcanvas-header">
+        <h5 id="sidebarLabel"><i class="align-middle me-2 far fa-fw fa-clipboard"></i> Anton's history</h5>
+        <a type="button" class="text-reset" data-bs-dismiss="offcanvas" aria-label="Close">
+            <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" fill="currentColor" class="bi bi-caret-right" viewBox="0 0 16 16">
+                <path d="M6 12.796V3.204L11.481 8zm.659.753 5.48-4.796a1 1 0 0 0 0-1.506L6.66 2.451C6.011 1.885 5 2.345 5 3.204v9.592a1 1 0 0 0 1.659.753"/>
+            </svg>
+        </a>
+    </div>
+    <div class="offcanvas-body">
+        <div class="container-fluid full-height" id="anton-task-detail-container">
+            <!-- Anton AI data will be inserted here dynamically -->
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Editing Subtask -->
+<div class="modal fade" id="editSubtaskModal" tabindex="-1" aria-labelledby="editSubtaskModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="editSubtaskModalLabel">Edit Subtask</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="subtask-edit-form-wrapper">
+                    <form id="subtask-edit-form" class="form-inline">
+                        <input type="hidden" id="edit-subtask-id" value=""/>
+                        <div class="form-group">
+                            <label for="edit-subtask-title">Subtask Title:</label>
+                            <input type="text" id="edit-subtask-title" class="form-control" placeholder="Enter subtask title">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Subtask</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Creating Subtask -->
+<div class="modal fade" id="createSubtaskModal" tabindex="-1" aria-labelledby="createSubtaskModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="createSubtaskModalLabel">Create Subtask</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="subtask-form">
+                    <input type="hidden" id="task-id">
+                    <div class="form-group">
+                        <label for="subtask-title">Subtask Title:</label>
+                        <input type="text" id="subtask-title" class="form-control" placeholder="Enter subtask title" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create Subtask</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -15,15 +15,27 @@ urlpatterns = [
     path('task-list/<int:category_id>/', views.task_list, name='task-list'),
     path('task-detail/<str:pk>/', views.task_detail, name='task-detail'),
     path('task-create/', views.task_create, name='task-create'),
-    path('task-update/<str:pk>/', views.task_update, name='task-update'), 
+    path('toggle-task-completion/<str:pk>/', views.toggle_task_completion, name='toggle-task-completionv'),
+    path('task-update/<str:pk>/', views.task_update, name='task-update'),
     path('task-delete/<str:pk>/', views.task_delete, name='task-delete'),
+    path('delete-all-tasks-in-category/<int:category_id>/', views.delete_all_tasks_in_category, name='delete-all-tasks-in-category'),
+    path('category-details/<str:pk>/', views.category_details_api, name='category_details_api'),
     ## SUBTASK C.R.U.D 
     path('subtask-create/', views.subtask_create, name='subtask-create'),
-    path('delete-subtask/<int:pk>/', views.delete_subtask, name='delete-subtask'),
+    path('subtask-delete/<int:subtask_id>/', views.subtask_delete, name='subtask-delete'),
     path('update-subtask-completion-status/<int:pk>/', views.update_subtask_completion_status, name='update-subtask-completion-status'),
+    path('delete-all-subtasks/<int:task_id>/', views.delete_all_subtasks, name='delete-all-subtasks'),
     path('subtask-update/<int:subtask_id>/', views.subtask_update, name='subtask-update'),
-    ## SORTABLEJS
-    path('update-task-positions/', views.update_task_positions, name='update-task-positions'),
+    ## JURNAL C.R.U.D
+    path('jurnal-list/', views.jurnal_list, name='jurnal-list'),
+    path('jurnal-detail/<str:pk>/', views.jurnal_detail, name='jurnal-detail'),
+    path('jurnal-create/', views.jurnal_create, name='jurnal-create'),
+    path('jurnal-update/<str:pk>/', views.jurnal_update, name='jurnal-update'),
+    path('jurnal-delete/<str:pk>', views.jurnal_delete, name='jurnal-delete'),
+    ## SORTABLEJS 
+    path('update-task-order/<int:category_id>/', views.update_task_order, name='update-task-order'),
+
+    path('jurnal-update-order/', views.update_jurnal_order, name='jurnal-update-order'),
     ## SEARCH BAR
     path('tasks/search/', views.search_tasks, name='search-tasks'),
     path('categories/search/', views.search_categories, name='search-categories'),

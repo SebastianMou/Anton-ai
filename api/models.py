@@ -70,12 +70,12 @@ class Task(models.Model):
 
     class Meta:
         verbose_name_plural = 'tasks'
-        ordering = ('difficulty', 'position', 'created_at')
+        ordering = ('position', 'difficulty', '-created_at')
 
 class SubTask(models.Model):
     # A reference to the parent task
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='subtasks')
-    
+
     # Basic subtask fields
     title = models.CharField(max_length=255)
     completed = models.BooleanField(default=False)
@@ -88,6 +88,20 @@ class SubTask(models.Model):
     class Meta:
         verbose_name_plural = 'subtasks'
         ordering = ('created_at',)
+
+class Jurnal(models.Model):
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='jurnals', null=True)
+    title = models.CharField(max_length=255)
+    description = HTMLField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    position = models.PositiveIntegerField(default=0, blank=False, null=False) 
+
+    def __str__(self) -> str:
+        return self.title
+
+    class Meta:
+        ordering = ('position', '-created_at')
 
 class Notifications(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)

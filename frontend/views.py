@@ -181,6 +181,19 @@ def task_list(request, pk):
     }
     return render(request, 'tasks/tasks-list.html', context)
 
+def task_all(request, pk):
+    # category = TaskCategory.objects.get(id=pk, owner=request.user)
+    category = get_object_or_404(TaskCategory, id=pk, owner=request.user)
+
+    tasks = Task.objects.filter(owner=request.user, category=pk)
+    
+    context = {
+        'tasks': tasks,
+        'pk': pk,
+        'category': category
+    }
+    return render(request, 'tasks/task-all.html', context)
+
 def task_list_detail(request):
     return render(request, 'tasks/task_list_detail.html')
 
@@ -245,6 +258,8 @@ def goal_form_view(request):
 
     return render(request, 'authentication/goal_form.html', context)
 
+def jurnal(request):
+    return render(request, 'writing/jurnal.html')
 
 def chatgpt_tester(request):
     openai.api_key = settings.OPENAI_API_KEY

@@ -12,6 +12,7 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('email-login/', views.email_login, name='email-login'),
     path('task-list/<str:pk>/', views.task_list, name='task_list'),
+    path('task-all/<str:pk>/', views.task_all, name='task_all'),
     path('task-project-detail/', views.task_list_detail, name='task-project-detail'),
     path('check_email/', views.check_email, name='check_email'),
 
@@ -27,6 +28,7 @@ urlpatterns = [
     path('500/', views.error_500_page, name='error_500_page'),
     path('notifications_list/', views.notifications_list, name='notifications_list'),
     path('profile/', views.profile, name='profile'),
+    path('jurnal/', views.jurnal, name='jurnal'),
 
     # activación de la cuenta de usuario por correo electrónico
     path('activate/<uidb64>/<token>', views.activate, name='activate'),
